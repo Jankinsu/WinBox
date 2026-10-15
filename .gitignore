@@ -1,0 +1,14 @@
+# PowerShell temporary files
+*.tmp
+*.log
+
+# Local configuration
+Config.local.psd1
+
+# IDE
+.vscode/
+.idea/
+
+# Windows
+Thumbs.db
+Desktop.ini
