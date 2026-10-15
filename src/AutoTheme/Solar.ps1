@@ -117,7 +117,6 @@ function Get-AutoThemeConfig {
     }
 
     # Validate the time zone and the effective event order for today.
-    $null = [TimeZoneInfo]::FindSystemTimeZoneById([string]$config.TimeZoneId)
     $timeZone = [TimeZoneInfo]::FindSystemTimeZoneById([string]$config.TimeZoneId)
     $configuredToday = ([TimeZoneInfo]::ConvertTimeFromUtc([datetime]::UtcNow, $timeZone)).Date
     $events = Get-SunriseSunset -Date $configuredToday -Latitude ([double]$config.Latitude) -Longitude ([double]$config.Longitude) -TimeZoneId ([string]$config.TimeZoneId)
@@ -148,7 +147,9 @@ function Get-ConfiguredLocalNow {
 }
 
 if ($MyInvocation.InvocationName -ne '.') {
-    $result = Get-SunriseSunset -Date (Get-Date) -Latitude 39.9042 -Longitude 116.4074 -TimeZoneId 'China Standard Time'
+    $chinaTimeZone = [TimeZoneInfo]::FindSystemTimeZoneById('China Standard Time')
+    $chinaToday = ([TimeZoneInfo]::ConvertTimeFromUtc([datetime]::UtcNow, $chinaTimeZone)).Date
+    $result = Get-SunriseSunset -Date $chinaToday -Latitude 39.9042 -Longitude 116.4074 -TimeZoneId 'China Standard Time'
     'Date: {0:yyyy-MM-dd}' -f $result.Date
     'Sunrise: {0:HH:mm}' -f $result.Sunrise
     'Sunset: {0:HH:mm}' -f $result.Sunset

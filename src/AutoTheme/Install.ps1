@@ -21,7 +21,8 @@ try {
     'Creating or updating tasks...'
 
     $refreshAction = New-AutoThemeAction -ScriptArguments @('-Mode', 'Refresh')
-    Register-AutoThemeTask -Name 'WinBox-AutoTheme-Refresh' -Action $refreshAction -Trigger (New-ScheduledTaskTrigger -Daily -At '00:05') -StartWhenAvailable
+    $refreshAt = (Get-Date).Date.AddMinutes(5)
+    Register-AutoThemeTask -Name 'WinBox-AutoTheme-Refresh' -Action $refreshAction -Trigger (New-ScheduledTaskTrigger -Daily -At $refreshAt) -StartWhenAvailable
     Update-AutoThemeSolarTasks -Config $config
     Register-AutoThemeTask -Name 'WinBox-AutoTheme-Sync' -Action (New-AutoThemeAction -ScriptArguments @('-Mode', 'Sync')) -Trigger (New-ScheduledTaskTrigger -AtLogOn -User ([System.Security.Principal.WindowsIdentity]::GetCurrent().Name))
     Register-AutoThemeResumeTask
