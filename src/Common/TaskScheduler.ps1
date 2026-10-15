@@ -16,13 +16,44 @@ function Get-AutoThemePowerShellPath {
     throw 'Neither pwsh.exe nor powershell.exe was found.'
 }
 
+function Get-AutoThemeWScriptPath {
+    $wscript = Get-Command wscript.exe -ErrorAction SilentlyContinue
+    if ($wscript) { return $wscript.Source }
+    throw 'wscript.exe was not found. WinBox requires Windows Script Host to start scheduled PowerShell tasks without showing a console window.'
+}
+
+function Format-AutoThemeArgument {
+    param([Parameter(Mandatory)][string] $Value)
+    '"{0}"' -f $Value
+}
+
+function New-AutoThemeHiddenLauncherArguments {
+    param(
+        [Parameter(Mandatory)][string] $EnginePath,
+        [Parameter(Mandatory)][string] $ScriptPath,
+        [Parameter(Mandatory)][string[]] $ScriptArguments,
+        [string] $LauncherPath = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'RunHidden.vbs'))
+    )
+
+    $arguments = @(
+        '//B'
+        '//NoLogo'
+        (Format-AutoThemeArgument ([System.IO.Path]::GetFullPath($LauncherPath)))
+        (Format-AutoThemeArgument $EnginePath)
+        (Format-AutoThemeArgument $ScriptPath)
+    )
+    $arguments += @($ScriptArguments | ForEach-Object { Format-AutoThemeArgument ([string]$_) })
+    $arguments -join ' '
+}
+
 function New-AutoThemeAction {
     param([string[]] $ScriptArguments)
     $scriptPath = Join-Path $PSScriptRoot '..\AutoTheme\AutoTheme.ps1'
     $engine = Get-AutoThemePowerShellPath
-    $quotedScript = '"{0}"' -f [System.IO.Path]::GetFullPath($scriptPath)
-    $argumentText = ($ScriptArguments | ForEach-Object { '"{0}"' -f $_ }) -join ' '
-    New-ScheduledTaskAction -Execute $engine -Argument ("-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File $quotedScript $argumentText")
+    $wscript = Get-AutoThemeWScriptPath
+    $scriptPath = [System.IO.Path]::GetFullPath($scriptPath)
+    $launcherArguments = New-AutoThemeHiddenLauncherArguments -EnginePath $engine -ScriptPath $scriptPath -ScriptArguments $ScriptArguments
+    New-ScheduledTaskAction -Execute $wscript -Argument $launcherArguments
 }
 
 function Register-AutoThemeTask {
@@ -49,11 +80,14 @@ function New-AutoThemeResumeTaskXml {
     param(
         [string] $UserName = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name,
         [string] $EnginePath = (Get-AutoThemePowerShellPath),
+        [string] $LauncherHostPath = (Get-AutoThemeWScriptPath),
+        [string] $LauncherPath = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'RunHidden.vbs')),
         [string] $ScriptPath = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\AutoTheme\AutoTheme.ps1'))
     )
     $escapedUser = [System.Security.SecurityElement]::Escape($userName)
-    $escapedEngine = [System.Security.SecurityElement]::Escape($EnginePath)
-    $escapedScript = [System.Security.SecurityElement]::Escape($scriptPath)
+    $escapedLauncherHost = [System.Security.SecurityElement]::Escape($LauncherHostPath)
+    $launcherArguments = New-AutoThemeHiddenLauncherArguments -EnginePath $EnginePath -ScriptPath $ScriptPath -ScriptArguments @('-Mode', 'Sync') -LauncherPath $LauncherPath
+    $escapedLauncherArguments = [System.Security.SecurityElement]::Escape($launcherArguments)
     @"
 <?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
@@ -61,7 +95,7 @@ function New-AutoThemeResumeTaskXml {
   <Triggers><EventTrigger><Enabled>true</Enabled><Subscription>&lt;QueryList&gt;&lt;Query Id="0" Path="System"&gt;&lt;Select Path="System"&gt;*[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and EventID=1]]&lt;/Select&gt;&lt;/Query&gt;&lt;/QueryList&gt;</Subscription></EventTrigger></Triggers>
   <Principals><Principal id="Author"><UserId>$escapedUser</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>
   <Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy><DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries><StopIfGoingOnBatteries>false</StopIfGoingOnBatteries><ExecutionTimeLimit>PT5M</ExecutionTimeLimit><Enabled>true</Enabled></Settings>
-  <Actions Context="Author"><Exec><Command>$escapedEngine</Command><Arguments>-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;$escapedScript&quot; -Mode Sync</Arguments></Exec></Actions>
+  <Actions Context="Author"><Exec><Command>$escapedLauncherHost</Command><Arguments>$escapedLauncherArguments</Arguments></Exec></Actions>
 </Task>
 "@
 }

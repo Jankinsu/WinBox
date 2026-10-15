@@ -9,4 +9,4 @@ AutoTheme separates four concerns:
 - `TaskScheduler.ps1` creates, refreshes, and removes AutoTheme tasks.
 - `Install.ps1` and `Uninstall.ps1` manage the task lifecycle.
 
-Scheduled tasks use the current user's interactive token and least privilege because the theme values are under `HKCU`. Task actions use absolute script paths so their behavior does not depend on the working directory.
+Scheduled tasks use the current user's interactive token and least privilege because the theme values are under `HKCU`. Task actions use absolute script paths so their behavior does not depend on the working directory. They start PowerShell through the Windows Script Host helper `src/Common/RunHidden.vbs`; this launches the console process hidden from its start and avoids a visible console flash when a task runs in the signed-in session.

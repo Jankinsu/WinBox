@@ -27,12 +27,20 @@ try { $null = Get-SunriseSunset -Date ([datetime]'2026-06-21') -Latitude 90 -Lon
 catch { $polarFailed = $true }
 if (-not $polarFailed) { throw 'Polar day should return a clear error.' }
 
-$resumeXml = [xml](New-AutoThemeResumeTaskXml -UserName 'CONTOSO\Test User' -EnginePath 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' -ScriptPath 'C:\WinBox\AutoTheme.ps1')
+$resumeXml = [xml](New-AutoThemeResumeTaskXml -UserName 'CONTOSO\Test User' -EnginePath 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' -LauncherHostPath 'C:\Windows\System32\wscript.exe' -LauncherPath 'C:\WinBox\RunHidden.vbs' -ScriptPath 'C:\WinBox\AutoTheme.ps1')
 $namespace = [System.Xml.XmlNamespaceManager]::new($resumeXml.NameTable)
 $namespace.AddNamespace('task', 'http://schemas.microsoft.com/windows/2004/02/mit/task')
 Assert-Equal 'CONTOSO\Test User' $resumeXml.SelectSingleNode('//task:Principal/task:UserId', $namespace).InnerText 'Resume task user'
 $eventSubscription = [System.Net.WebUtility]::HtmlDecode($resumeXml.SelectSingleNode('//task:EventTrigger/task:Subscription', $namespace).InnerText)
 if ($eventSubscription -notmatch "Power-Troubleshooter" -or $eventSubscription -notmatch 'EventID=1') { throw 'Resume task should subscribe to the Windows resume event.' }
-Assert-Equal '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "C:\WinBox\AutoTheme.ps1" -Mode Sync' $resumeXml.SelectSingleNode('//task:Actions/task:Exec/task:Arguments', $namespace).InnerText 'Resume task action'
+Assert-Equal 'C:\Windows\System32\wscript.exe' $resumeXml.SelectSingleNode('//task:Actions/task:Exec/task:Command', $namespace).InnerText 'Resume task launcher'
+Assert-Equal '//B //NoLogo "C:\WinBox\RunHidden.vbs" "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" "C:\WinBox\AutoTheme.ps1" "-Mode" "Sync"' $resumeXml.SelectSingleNode('//task:Actions/task:Exec/task:Arguments', $namespace).InnerText 'Resume task action'
+
+$syncArguments = New-AutoThemeHiddenLauncherArguments -EnginePath 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' -ScriptPath 'C:\WinBox\AutoTheme.ps1' -ScriptArguments @('-Mode', 'Sync') -LauncherPath 'C:\WinBox\RunHidden.vbs'
+Assert-Equal '//B //NoLogo "C:\WinBox\RunHidden.vbs" "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" "C:\WinBox\AutoTheme.ps1" "-Mode" "Sync"' $syncArguments 'Sync task launcher arguments'
+
+$hiddenLauncher = Get-Content -Raw (Join-Path $PSScriptRoot '..\src\Common\RunHidden.vbs')
+if ($hiddenLauncher -notmatch 'WScript\.Quit shell\.Run\(command, 0, True\)') { throw 'Hidden launcher should wait for PowerShell and pass its result back to Task Scheduler.' }
+if ($hiddenLauncher -notmatch '-WindowStyle Hidden') { throw 'PowerShell should retain its hidden window setting.' }
 
 'AutoTheme checks passed.'
