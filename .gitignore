@@ -5,6 +5,9 @@
 # Local configuration
 Config.local.psd1
 
+# Local implementation plan
+/项目实现方案.md
+
 # IDE
 .vscode/
 .idea/
