@@ -1,5 +1,7 @@
 # WinBox
 
+**English** | [简体中文](README.zh-CN.md)
+
 A lightweight Windows automation toolkit built primarily with PowerShell and native Windows capabilities.
 
 ## Design Philosophy
