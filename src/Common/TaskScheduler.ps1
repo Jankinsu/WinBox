@@ -45,14 +45,16 @@ function Register-AutoThemeTask {
     "[OK] $Name"
 }
 
-function Register-AutoThemeResumeTask {
-    $userName = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-    $engine = Get-AutoThemePowerShellPath
-    $scriptPath = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\AutoTheme\AutoTheme.ps1'))
+function New-AutoThemeResumeTaskXml {
+    param(
+        [string] $UserName = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name,
+        [string] $EnginePath = (Get-AutoThemePowerShellPath),
+        [string] $ScriptPath = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\AutoTheme\AutoTheme.ps1'))
+    )
     $escapedUser = [System.Security.SecurityElement]::Escape($userName)
-    $escapedEngine = [System.Security.SecurityElement]::Escape($engine)
+    $escapedEngine = [System.Security.SecurityElement]::Escape($EnginePath)
     $escapedScript = [System.Security.SecurityElement]::Escape($scriptPath)
-    $xml = @"
+    @"
 <?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo><Description>Synchronize the current theme after Windows resumes from sleep.</Description></RegistrationInfo>
@@ -62,6 +64,10 @@ function Register-AutoThemeResumeTask {
   <Actions Context="Author"><Exec><Command>$escapedEngine</Command><Arguments>-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;$escapedScript&quot; -Mode Sync</Arguments></Exec></Actions>
 </Task>
 "@
+}
+
+function Register-AutoThemeResumeTask {
+    $xml = New-AutoThemeResumeTaskXml
     Register-ScheduledTask -TaskName 'WinBox-AutoTheme-ResumeSync' -Xml $xml -Force | Out-Null
     '[OK] WinBox-AutoTheme-ResumeSync'
 }

@@ -1,5 +1,6 @@
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '..\src\AutoTheme\Solar.ps1')
+. (Join-Path $PSScriptRoot '..\src\Common\TaskScheduler.ps1')
 
 function Assert-Equal {
     param($Expected, $Actual, [string] $Message)
@@ -25,5 +26,13 @@ $polarFailed = $false
 try { $null = Get-SunriseSunset -Date ([datetime]'2026-06-21') -Latitude 90 -Longitude 0 -TimeZoneId 'UTC' }
 catch { $polarFailed = $true }
 if (-not $polarFailed) { throw 'Polar day should return a clear error.' }
+
+$resumeXml = [xml](New-AutoThemeResumeTaskXml -UserName 'CONTOSO\Test User' -EnginePath 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' -ScriptPath 'C:\WinBox\AutoTheme.ps1')
+$namespace = [System.Xml.XmlNamespaceManager]::new($resumeXml.NameTable)
+$namespace.AddNamespace('task', 'http://schemas.microsoft.com/windows/2004/02/mit/task')
+Assert-Equal 'CONTOSO\Test User' $resumeXml.SelectSingleNode('//task:Principal/task:UserId', $namespace).InnerText 'Resume task user'
+$eventSubscription = [System.Net.WebUtility]::HtmlDecode($resumeXml.SelectSingleNode('//task:EventTrigger/task:Subscription', $namespace).InnerText)
+if ($eventSubscription -notmatch "Power-Troubleshooter" -or $eventSubscription -notmatch 'EventID=1') { throw 'Resume task should subscribe to the Windows resume event.' }
+Assert-Equal '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "C:\WinBox\AutoTheme.ps1" -Mode Sync' $resumeXml.SelectSingleNode('//task:Actions/task:Exec/task:Arguments', $namespace).InnerText 'Resume task action'
 
 'AutoTheme checks passed.'
